@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中文文本统计</title>
+  <style>
+    /* ===== 极简样式：白底黑字，不用任何外部库 ===== */
+
+    /* 重置默认边距，让宽高计算更直观 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #ffffff;   /* 白色背景 */
+      color: #000000;        /* 黑色文字 */
+      font-family: -apple-system, "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* 内容居中，限制最大宽度，手机等窄屏会自动变窄 */
+    .container {
+      width: min(100%, 960px);
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    /* 统计卡片网格：卡片自动换行，最小 140px 宽 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      min-width: 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+
+    .card .label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .card .note {          /* 卡片里的小字说明 */
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    .card .value {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .card .value.reading {  /* "预计阅读时间"文字较长，字号稍小 */
+      font-size: 19px;
+    }
+
+    /* 按钮栏：四个按钮横排，窄屏自动换行 */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 8px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #fff;
+      color: #000;
+      border: 1px solid #000;
+      border-radius: 4px;
+    }
+
+    button.primary {        /* "清空"按钮做成黑底白字，更醒目 */
+      background: #000;
+      color: #fff;
+    }
+
+    button:hover {
+      background: #f2f2f2;
+    }
+
+    button.primary:hover {
+      background: #333;
+    }
+
+    /* 大的文本输入框 */
+    textarea {
+      width: 100%;
+      max-width: 100%;
+      height: 36vh;            /* 高度约为屏幕的三分之一 */
+      min-height: 200px;
+      padding: 12px;
+      font-size: 16px;
+      line-height: 1.7;
+      border: 1px solid #000;
+      border-radius: 6px;
+      outline: none;
+      font-family: inherit;
+      resize: vertical;        /* 允许上下拖动调整高度 */
+    }
+
+    /* 下面的面板：关键词统计、标点统计 */
+    .panel {
+      min-width: 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+
+    .panel h2 {
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+
+    .panel h3 {
+      font-size: 13px;
+      color: #666;
+      margin: 14px 0 8px;
+    }
+
+    /* 词条 / 标点的小标签 */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      max-width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .chip b {
+      font-weight: 600;
+    }
+
+    .chip em {
+      font-style: normal;
+      color: #666;
+      margin-left: 4px;
+    }
+
+    .empty {
+      color: #999;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <h1>中文文本统计</h1>
+
+    <!-- ===== 统计卡片区：九个数字由下方 JavaScript 实时更新 ===== -->
+    <div class="stats-grid">
+      <div class="card">
+        <div class="label">总字数</div>
+        <div class="value" id="statTotalWords">0</div>
+        <div class="note">中文字符 + 英文单词</div>
+      </div>
+      <div class="card">
+        <div class="label">中文字符数</div>
+        <div class="value" id="statCnChars">0</div>
+      </div>
+      <div class="card">
+        <div class="label">英文单词数</div>
+        <div class="value" id="statEnWords">0</div>
+      </div>
+      <div class="card">
+        <div class="label">数字数</div>
+        <div class="value" id="statDigits">0</div>
+      </div>
+      <div class="card">
+        <div class="label">其他字符数</div>
+        <div class="value" id="statOther">0</div>
+      </div>
+      <div class="card">
+        <div class="label">总字符数（含空格）</div>
+        <div class="value" id="statChars">0</div>
+      </div>
+      <div class="card">
+        <div class="label">行数</div>
+        <div class="value" id="statLines">0</div>
+      </div>
+      <div class="card">
+        <div class="label">段落数</div>
+        <div class="value" id="statParas">0</div>
+      </div>
+      <div class="card">
+        <div class="label">预计阅读时间</div>
+        <div class="value reading" id="statReading">—</div>
+        <div class="note">按每分钟 400 字</div>
+      </div>
+    </div>
+
+    <!-- ===== 按钮栏 ===== -->
+    <div class="toolbar">
+      <button id="clearBtn" class="primary">清空</button>
+      <button id="copyBtn">复制统计结果</button>
+      <button id="trimLinesBtn">去除空行</button>
+      <button id="trimSpaceBtn">去除首尾空格</button>
+    </div>
+
+    <!-- ===== 大的文本输入框 ===== -->
+    <textarea id="textInput" placeholder="请在这里粘贴或输入文字…"></textarea>
+
+    <!-- ===== 关键词频率统计 ===== -->
+    <div class="panel">
+      <h2>关键词频率 TOP 10（使用浏览器自带的 Intl.Segmenter 中文分词）</h2>
+      <div class="chips" id="keywords"></div>
+    </div>
+
+    <!-- ===== 标点符号统计 ===== -->
+    <div class="panel">
+      <h2>标点符号统计</h2>
+      <h3>中文标点</h3>
+      <div class="chips" id="cnPunct"></div>
+      <h3>英文标点</h3>
+      <div class="chips" id="enPunct"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // ============================================================
+    // 1. 获取页面上的元素，存成变量
+    // ============================================================
+    const textarea = document.getElementById('textInput');
+    const statTotalWords = document.getElementById('statTotalWords');
+    const statCnChars = document.getElementById('statCnChars');
+    const statEnWords = document.getElementById('statEnWords');
+    const statDigits = document.getElementById('statDigits');
+    const statOther = document.getElementById('statOther');
+    const statChars = document.getElementById('statChars');
+    const statLines = document.getElementById('statLines');
+    const statParas = document.getElementById('statParas');
+    const statReading = document.getElementById('statReading');
+    const kwBox = document.getElementById('keywords');       // 关键词容器
+    const cnPunctBox = document.getElementById('cnPunct');   // 中文标点容器
+    const enPunctBox = document.getElementById('enPunct');   // 英文标点容器
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const trimLinesBtn = document.getElementById('trimLinesBtn');
+    const trimSpaceBtn = document.getElementById('trimSpaceBtn');
+
+    // ============================================================
+    // 2. 常用常量
+    // ============================================================
+    // 停用词表：关键词统计时要忽略的常见虚词（Set 会自动去重）
+    const STOPWORDS = new Set([
+      '的','了','是','在','我','你','他','她','它','们','这','那','有','和',
+      '就','不','人','都','一','一个','上','也','很','到','说','要','去',
+      '会','着','没有','看','好','自己'
+    ]);
+
+    // 中文标点（“（）”虽然题设没列，但很常见，一并统计；想增删直接改这个字符串）
+    const CN_PUNCT = '，。？！；：、“”‘’《》【】（）"';
+    // 英文标点（半角）
+    const EN_PUNCT = ',.?!;:"\'()[]{}';
+
+    // ============================================================
+    // 3. 核心统计：数字类结果
+    // ============================================================
+    function analyze(text) {
+      // 总字符数：包括空格、换行在内的所有字符
+      const totalChars = text.length;
+
+      // 中文字符数：匹配 CJK 统一汉字区（U+4E00 ~ U+9FFF）
+      const cnChars = (text.match(/[一-鿿]/g) || []).length;
+
+      // 英文单词数：连续字母，支持 won't 这类带撇号的缩写
+      const enWords = (text.match(/[a-zA-Z]+(?:'[a-zA-Z]+)?/g) || []).length;
+
+      // 数字数：每个阿拉伯数字算 1 个
+      const digits = (text.match(/\d/g) || []).length;
+
+      // 英文字母数：只用来计算下面的“其他字符”，不单独展示
+      const enLetters = (text.match(/[a-zA-Z]/g) || []).length;
+
+      // 去掉所有空白后的总字符数
+      const noSpace = text.replace(/\s+/g, '').length;
+
+      // 其他字符数 = 非空白总字符 - 中文 - 英文字母 - 数字
+      // （标点、全角符号等都归入“其他”）
+      const other = noSpace - cnChars - enLetters - digits;
+
+      // 总字数 = 中文字符数 + 英文单词数
+      const totalWords = cnChars + enWords;
+
+      // 行数：按换行符拆分，只统计非空行
+      const lines = text.split('\n').filter(l => l.trim() !== '').length;
+
+      // 段落数：按“空行”分隔段落，只统计非空段落
+      const paras = text.split(/\n\s*\n/).filter(p => p.trim() !== '').length;
+
+      return { totalChars, cnChars, enWords, digits, other, totalWords, lines, paras };
+    }
+
+    // 预计阅读时间：按每分钟 400 字换算成“X 分 Y 秒”
+    function formatReadingTime(totalWords) {
+      if (totalWords === 0) return '—';
+      const secs = (totalWords / 400) * 60;
+      if (secs < 60) return '约 ' + Math.round(secs) + ' 秒';
+      const m = Math.floor(secs / 60);
+      const s = Math.round(secs % 60);
+      return s === 0 ? '约 ' + m + ' 分钟' : '约 ' + m + ' 分 ' + s + ' 秒';
+    }
+
+    // ============================================================
+    // 4. 关键词统计：使用浏览器自带的 Intl.Segmenter 做中文分词
+    // ============================================================
+    function getTopKeywords(text) {
+      const count = new Map();
+      try {
+        // 现代浏览器（Chrome / Edge / Safari / Firefox）都支持 Intl.Segmenter
+        const segments = new Intl.Segmenter('zh', { granularity: 'word' }).segment(text);
+        for (const s of segments) {
+          const w = s.segment.trim().toLowerCase();
+          // isWordLike 为 false 的是标点、空白等，直接跳过
+          if (!s.isWordLike) continue;
+          // 过滤规则：单个字不要、停用词不要、不含中文或英文的词（如纯数字）不要
+          if (w.length < 2) continue;
+          if (STOPWORDS.has(w)) continue;
+          if (!/[一-鿿A-Za-z]/.test(w)) continue;
+          count.set(w, (count.get(w) || 0) + 1);
+        }
+      } catch (e) {
+        // 老浏览器不支持 Intl.Segmenter 时的简化方案：按非文字字符粗暴切分
+        const words = text.split(/[^一-鿿A-Za-z]+/);
+        for (const w of words) {
+          if (w.length < 2 || STOPWORDS.has(w)) continue;
+          count.set(w, (count.get(w) || 0) + 1);
+        }
+      }
+      // 按出现次数从多到少排序，取前 10 个
+      return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    }
+
+    // ============================================================
+    // 5. 标点符号统计：逐字符查表
+    // ============================================================
+    function countPunct(text) {
+      const cn = new Map();
+      const en = new Map();
+      for (const ch of text) {                       // 遍历每一个字符
+        if (CN_PUNCT.includes(ch)) cn.set(ch, (cn.get(ch) || 0) + 1);
+        if (EN_PUNCT.includes(ch)) en.set(ch, (en.get(ch) || 0) + 1);
+      }
+      // 转成数组并按次数从多到少排序
+      return {
+        cn: [...cn.entries()].sort((a, b) => b[1] - a[1]),
+        en: [...en.entries()].sort((a, b) => b[1] - a[1])
+      };
+    }
+
+    // ============================================================
+    // 6. 渲染页面
+    // ============================================================
+    // 防止特殊字符破坏页面结构（比如用户输入 <script> 之类）
+    function escapeHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // 渲染关键词 TOP10 标签
+    function renderKeywords(list) {
+      if (!list.length) {
+        kwBox.innerHTML = '<span class="empty">暂无关键词（文本太短或多为停用词）</span>';
+        return;
+      }
+      kwBox.innerHTML = list.map((item, i) =>
+        '<span class="chip"><b>' + (i + 1) + '. ' + escapeHtml(item[0]) + '</b><em>' + item[1] + ' 次</em></span>'
+      ).join('');
+    }
+
+    // 渲染标点标签（只显示出现过的标点）
+    function renderPunct(box, list, emptyText) {
+      if (!list.length) {
+        box.innerHTML = '<span class="empty">' + emptyText + '</span>';
+        return;
+      }
+      box.innerHTML = list.map(item =>
+        '<span class="chip">' + escapeHtml(item[0]) + '<em>×' + item[1] + '</em></span>'
+      ).join('');
+    }
+
+    // 总入口：重新计算并刷新整个页面
+    function updateAll() {
+      const text = textarea.value;
+      const r = analyze(text);
+
+      // 更新九个统计卡片
+      statTotalWords.textContent = r.totalWords;
+      statCnChars.textContent = r.cnChars;
+      statEnWords.textContent = r.enWords;
+      statDigits.textContent = r.digits;
+      statOther.textContent = r.other;
+      statChars.textContent = r.totalChars;
+      statLines.textContent = r.lines;
+      statParas.textContent = r.paras;
+      statReading.textContent = formatReadingTime(r.totalWords);
+
+      // 更新关键词和标点
+      renderKeywords(getTopKeywords(text));
+      const p = countPunct(text);
+      renderPunct(cnPunctBox, p.cn, '无中文标点');
+      renderPunct(enPunctBox, p.en, '无英文标点');
+    }
+
+    // ============================================================
+    // 7. 按钮事件
+    // ============================================================
+    // 实时统计：输入框内容一变（打字、粘贴、删除）就重新统计
+    textarea.addEventListener('input', updateAll);
+
+    // 清空按钮
+    clearBtn.addEventListener('click', () => {
+      textarea.value = '';
+      updateAll();
+      textarea.focus();
+    });
+
+    // 去除空行：删掉所有只含空白的行
+    trimLinesBtn.addEventListener('click', () => {
+      textarea.value = textarea.value.split('\n').filter(l => l.trim() !== '').join('\n');
+      updateAll();
+      textarea.focus();
+    });
+
+    // 去除首尾空格：每一行去掉开头和结尾的空格
+    trimSpaceBtn.addEventListener('click', () => {
+      textarea.value = textarea.value.split('\n').map(l => l.trim()).join('\n');
+      updateAll();
+      textarea.focus();
+    });
+
+    // 组装一份可复制的统计报告文字
+    function buildReport() {
+      const text = textarea.value;
+      const r = analyze(text);
+      const kw = getTopKeywords(text);
+      const p = countPunct(text);
+      return [
+        '===== 中文文本统计结果 =====',
+        '总字数：' + r.totalWords + '（中文字符 ' + r.cnChars + ' + 英文单词 ' + r.enWords + '）',
+        '中文字符数：' + r.cnChars,
+        '英文单词数：' + r.enWords,
+        '数字数：' + r.digits,
+        '其他字符数：' + r.other,
+        '总字符数（含空格）：' + r.totalChars,
+        '行数：' + r.lines,
+        '段落数：' + r.paras,
+        '预计阅读时间：' + formatReadingTime(r.totalWords),
+        '',
+        '【关键词 TOP 10】',
+        kw.length ? kw.map(item => item[0] + ' ×' + item[1]).join('、') : '无',
+        '',
+        '【中文标点】',
+        p.cn.length ? p.cn.map(item => item[0] + ' ×' + item[1]).join('、') : '无',
+        '',
+        '【英文标点】',
+        p.en.length ? p.en.map(item => item[0] + ' ×' + item[1]).join('、') : '无'
+      ].join('\n');
+    }
+
+    // 复制失败时的备用方案：临时创建一个隐藏文本框选中复制
+    function fallbackCopy(text, done) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    }
+
+    // 复制统计结果按钮
+    copyBtn.addEventListener('click', () => {
+      const report = buildReport();
+      // 复制成功后把按钮文字临时变成“已复制 ✓”提示用户
+      const done = () => {
+        const old = copyBtn.textContent;
+        copyBtn.textContent = '已复制 ✓';
+        setTimeout(() => { copyBtn.textContent = old; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(report).then(done).catch(() => fallbackCopy(report, done));
+      } else {
+        fallbackCopy(report, done);
+      }
+    });
+
+    // 页面打开时先统计一次（此时全是 0），并聚焦到输入框
+    updateAll();
+    textarea.focus();
+  </script>
+</body>
+</html>

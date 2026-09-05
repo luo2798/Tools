@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>倒数日</title>
+  <style>
+    /* ===== 极简样式：白底黑字，适合手机，不用任何外部库 ===== */
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #ffffff;
+      color: #000000;
+      font-family: -apple-system, "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* 窄容器：手机宽度正好，电脑上居中显示 */
+    .container {
+      width: min(100%, 560px);
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 18px 14px 40px;
+    }
+
+    /* ===== 顶部：标题 + 事件总数 ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 20px;
+    }
+
+    #count {
+      font-size: 12px;
+      color: #999;
+    }
+
+    /* ===== 添加事件的表单卡片 ===== */
+    .form-panel {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    /* 第一行：名称 + 日期 */
+    .f-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    #inName {
+      flex: 1;              /* 名称占满剩余宽度 */
+      min-width: 0;
+    }
+
+    #inDate {
+      width: 150px;         /* 日期选择器固定宽度 */
+      max-width: 100%;
+      flex: none;
+    }
+
+    #inName,
+    #inDate {
+      min-height: 44px;
+      padding: 10px;
+      font-size: 15px;
+      font-family: inherit;
+      border: 1px solid #000;
+      border-radius: 8px;
+      outline: none;
+    }
+
+    /* 第二行：分类圆点 + 添加按钮 */
+    .f-row2 {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .cats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cat-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #fff;      /* 白边 + 灰描边，让浅色圆点也看得清 */
+      outline: 1px solid #ddd;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.1s;
+    }
+
+    /* 当前选中的分类：外圈加粗变黑 */
+    .cat-btn.selected {
+      outline: 3px solid #000;
+    }
+
+    .cat-btn:active {
+      transform: scale(0.9);
+    }
+
+    .add-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .cat-name {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .btn {
+      min-height: 44px;
+      padding: 9px 18px;
+      font-size: 14px;
+      background: #000;
+      color: #fff;
+      border: 1px solid #000;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn:active {
+      background: #333;
+    }
+
+    /* ===== 一行提示：成功 / 报错 ===== */
+    .msg {
+      font-size: 12px;
+      color: #666;
+      margin: 8px 2px;
+      min-height: 16px;
+    }
+
+    .msg.err {
+      color: #c00000;
+    }
+
+    /* ===== 事件列表 ===== */
+    .card {
+      display: flex;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;      /* 让色条不超出圆角 */
+      background: #fff;
+    }
+
+    /* 左侧分类色条 */
+    .bar {
+      width: 5px;
+      flex: none;
+    }
+
+    .body {
+      flex: 1;
+      padding: 12px 12px 10px;
+      min-width: 0;          /* 允许内部文字省略号生效 */
+    }
+
+    /* 第一行：名称 + 删除按钮 */
+    .row1 {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .name {
+      font-size: 16px;
+      font-weight: 600;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .del {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      border: none;
+      background: none;
+      font-size: 18px;
+      line-height: 1;
+      color: #bbb;
+      cursor: pointer;
+      border-radius: 50%;
+    }
+
+    .del:hover {
+      color: #c00000;
+      background: #f5f5f5;
+    }
+
+    /* 第二行：日期·分类  |  还有 N 天 */
+    .row2 {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .days {
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+      flex: none;
+    }
+
+    .days b {
+      font-size: 24px;
+      color: var(--c, #000);   /* 数字颜色 = 该事件的分类颜色（行内 CSS 变量） */
+      line-height: 1;
+    }
+
+    .days b.past {
+      color: #999;              /* 已经过去的，数字用灰色 */
+    }
+
+    .days .cap {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .days i {
+      font-size: 12px;
+      font-style: normal;
+      color: #999;
+    }
+
+    /* “就是今天”的特别样式：红字 */
+    .days .today-badge {
+      font-size: 15px;
+      font-weight: 700;
+      color: #c00000;
+    }
+
+    /* 没有事件时的提示 */
+    .empty {
+      text-align: center;
+      color: #bbb;
+      font-size: 14px;
+      padding: 36px 0 20px;
+      line-height: 1.8;
+    }
+
+    .foot {
+      text-align: center;
+      font-size: 11px;
+      color: #ccc;
+      margin-top: 18px;
+    }
+
+    /* 很窄的屏幕（小手机）：分类行允许换行，按钮不拥挤 */
+    @media (max-width: 380px) {
+      .container {
+        padding-right: 10px;
+        padding-left: 10px;
+      }
+
+      .f-row:first-child > * {
+        width: 100%;
+        flex-basis: 100%;
+      }
+
+      #inDate {
+        width: 100%;
+      }
+
+      .f-row2 {
+        align-items: stretch;
+      }
+
+      .add-right {
+        width: 100%;
+        justify-content: space-between;
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <header>
+      <h1>📅 倒数日</h1>
+      <span id="count">共 0 个事件</span>
+    </header>
+
+    <!-- ===== 添加事件的表单 ===== -->
+    <form id="addForm" class="form-panel" autocomplete="off">
+      <div class="f-row">
+        <input type="text" id="inName" maxlength="20" placeholder="事件名称，如：信用卡还款">
+        <input type="date" id="inDate">
+      </div>
+      <div class="f-row f-row2">
+        <div class="cats" id="cats"><!-- 分类圆点由 JS 生成 --></div>
+        <div class="add-right">
+          <span class="cat-name" id="catName">生活</span>
+          <button type="submit" class="btn">＋ 添加</button>
+        </div>
+      </div>
+    </form>
+
+    <p class="msg" id="msg"></p>
+
+    <!-- ===== 事件列表（JS 渲染） ===== -->
+    <div class="list" id="list"></div>
+
+    <p class="foot">数据只保存在这台设备的浏览器里，不联网</p>
+
+  </div>
+
+  <script>
+    // ============================================================
+    // 1. 获取页面元素
+    // ============================================================
+    const addForm = document.getElementById('addForm');
+    const inName = document.getElementById('inName');
+    const inDate = document.getElementById('inDate');
+    const catsEl = document.getElementById('cats');
+    const catNameEl = document.getElementById('catName');
+    const msgEl = document.getElementById('msg');
+    const listEl = document.getElementById('list');
+    const countEl = document.getElementById('count');
+
+    // ============================================================
+    // 2. 分类配置：每个分类一个颜色。
+    //    想增删分类或改颜色，只改这里就行
+    // ============================================================
+    const CATEGORIES = [
+      { id: 'life',  name: '生活', color: '#2f9e44' },   // 绿
+      { id: 'work',  name: '工作', color: '#1971c2' },   // 蓝
+      { id: 'study', name: '学习', color: '#e8590c' },   // 橙
+      { id: 'other', name: '纪念', color: '#c2255c' }    // 玫红
+    ];
+
+    // ============================================================
+    // 3. 数据存储（localStorage：保存在本机浏览器，不联网）
+    // ============================================================
+    const STORAGE_KEY = 'countdown-events';
+
+    let events = loadEvents();          // 内存里的所有事件
+    let selectedCat = 0;                // 当前选中的分类下标
+
+    // 读取：文件损坏或浏览器禁用存储时，退回空列表
+    function loadEvents() {
+      try {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        return Array.isArray(data) ? data : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // 保存：每次增删后都写回 localStorage
+    function saveEvents() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+      } catch (e) {
+        showMsg('⚠️ 浏览器无法保存数据（可能处于无痕模式）', true);
+      }
+    }
+
+    // 生成一个不会重复的事件 id
+    function uid() {
+      return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    // ============================================================
+    // 4. 日期与天数计算
+    // ============================================================
+    // 今天，格式 YYYY-MM-DD（本地时间，不用 toISOString，
+    // 否则在早上 8 点前会算成“昨天”）
+    function todayString() {
+      const d = new Date();
+      return d.getFullYear() + '-' +
+             String(d.getMonth() + 1).padStart(2, '0') + '-' +
+             String(d.getDate()).padStart(2, '0');
+    }
+
+    // 把 "2026-09-04" 拆成年月日数字
+    function parseYMD(str) {
+      const p = str.split('-');
+      return { y: +p[0], m: +p[1], d: +p[2] };
+    }
+
+    // 目标日期与今天相差几天：
+    //   正数 = 还有几天，0 = 今天，负数 = 已过去几天
+    // 用 Date.UTC 只比较“日期”，不涉及时分秒和夏令时
+    function diffDays(targetStr) {
+      const t = parseYMD(targetStr);
+      const n = parseYMD(todayString());
+      const targetMs = Date.UTC(t.y, t.m - 1, t.d);
+      const todayMs = Date.UTC(n.y, n.m - 1, n.d);
+      return Math.round((targetMs - todayMs) / 86400000);
+    }
+
+    // ============================================================
+    // 5. 渲染列表
+    // ============================================================
+    // 防止用户输入的文字被当作 HTML 执行
+    function escapeHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // 把事件按日期排序：还没到的排前面（最近的在前），
+    // 已经过去的放后面（刚刚过去的在前）
+    function sortEvents() {
+      const today = todayString();
+      events.sort((a, b) => {
+        const pastA = a.date < today;
+        const pastB = b.date < today;
+        if (pastA !== pastB) return pastA ? 1 : -1;
+        return pastA
+          ? b.date.localeCompare(a.date)   // 都过去了：最近发生的在前
+          : a.date.localeCompare(b.date);  // 都还没到：最近的在前
+      });
+    }
+
+    // 生成一张事件卡片的 HTML
+    function cardHTML(ev) {
+      const cat = CATEGORIES.find(c => c.id === ev.category) || CATEGORIES[0];
+      const diff = diffDays(ev.date);
+      const d = parseYMD(ev.date);
+
+      // 日期文字：今年就省略年份（如 “9月10日”），别的年份带上（如 “2025年8月20日”）
+      const nowY = new Date().getFullYear();
+      const dateText = (d.y === nowY ? '' : d.y + '年') + d.m + '月' + d.d + '日';
+
+      // 右侧的“还有 N 天 / 已过去 N 天 / 就是今天”
+      let right;
+      if (diff > 0) {
+        right = '<span class="cap">还有</span><b>' + diff + '</b><i>天</i>';
+      } else if (diff < 0) {
+        right = '<span class="cap">已过去</span><b class="past">' + (-diff) + '</b><i>天</i>';
+      } else {
+        right = '<b class="today-badge">就是今天</b>';
+      }
+
+      // --c 是 CSS 变量，数字颜色会自动用上这个分类的颜色
+      return '<div class="card" data-id="' + ev.id + '" style="--c:' + cat.color + '">' +
+               '<div class="bar"></div>' +
+               '<div class="body">' +
+                 '<div class="row1">' +
+                   '<span class="name">' + escapeHtml(ev.name) + '</span>' +
+                   '<button class="del" title="删除">×</button>' +
+                 '</div>' +
+                 '<div class="row2">' +
+                   '<span class="meta">' + dateText + ' · ' + cat.name + '</span>' +
+                   '<span class="days">' + right + '</span>' +
+                 '</div>' +
+               '</div>' +
+             '</div>';
+    }
+
+    function render() {
+      sortEvents();
+      countEl.textContent = '共 ' + events.length + ' 个事件';
+
+      // 空列表的引导文字
+      if (!events.length) {
+        listEl.innerHTML = '<p class="empty">还没有事件<br>在上方输入名称和日期，点「添加」</p>';
+        return;
+      }
+      listEl.innerHTML = events.map(cardHTML).join('');
+    }
+
+    // ============================================================
+    // 6. 分类圆点（由 JS 按 CATEGORIES 生成，方便以后加分类）
+    // ============================================================
+    const catButtons = [];
+    CATEGORIES.forEach((cat, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cat-btn';
+      b.style.background = cat.color;
+      b.title = cat.name;                      // 长按/悬停显示分类名
+      b.addEventListener('click', () => selectCat(i));
+      catsEl.appendChild(b);
+      catButtons.push(b);
+    });
+
+    function selectCat(i) {
+      selectedCat = i;
+      catNameEl.textContent = CATEGORIES[i].name;
+      // 给选中的圆点加“选中”样式
+      catButtons.forEach((b, j) => {
+        b.classList.toggle('selected', j === i);
+      });
+    }
+
+    // ============================================================
+    // 7. 添加 / 删除事件
+    // ============================================================
+    let msgTimer = null;
+
+    // 表单下方的一行提示，2.5 秒后自动消失
+    function showMsg(text, isError) {
+      msgEl.textContent = text;
+      msgEl.className = 'msg' + (isError ? ' err' : '');
+      clearTimeout(msgTimer);
+      msgTimer = setTimeout(() => { msgEl.textContent = ''; }, 2500);
+    }
+
+    // 提交表单（点“添加”或回车）
+    addForm.addEventListener('submit', e => {
+      e.preventDefault();                       // 阻止页面刷新
+      const name = inName.value.trim();
+      if (!name) return showMsg('请填写事件名称', true);
+      if (!inDate.value) return showMsg('请选择日期', true);
+
+      events.push({
+        id: uid(),
+        name: name,
+        date: inDate.value,                     // YYYY-MM-DD
+        category: CATEGORIES[selectedCat].id
+      });
+      saveEvents();
+
+      inName.value = '';                        // 清空名称，方便连加
+      render();
+      showMsg('已添加「' + name + '」');
+      inName.focus();
+    });
+
+    // 删除：用“事件委托”——给整个列表监听一次点击，
+    // 点到的如果是删除按钮，就找到它所在的那张卡片删掉
+    listEl.addEventListener('click', e => {
+      const del = e.target.closest('.del');
+      if (!del) return;
+      const card = del.closest('.card');
+      const ev = events.find(x => x.id === card.dataset.id);
+      if (ev && confirm('删除「' + ev.name + '」？')) {
+        events = events.filter(x => x.id !== ev.id);
+        saveEvents();
+        render();
+        showMsg('已删除');
+      }
+    });
+
+    // ============================================================
+    // 8. 初始化
+    // ============================================================
+    inDate.value = todayString();               // 日期默认填今天
+    selectCat(0);                               // 默认选中“生活”
+    render();
+
+    // 页面从后台切回时重新渲染一次，让“还有 N 天”跨天后能自动更新
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) render();
+    });
+  </script>
+</body>
+</html>

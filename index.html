@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="日常小工具导航首页">
+  <title>我的小工具</title>
+  <style>
+    :root {
+      --ink: #202322;
+      --muted: #6d746f;
+      --paper: #f6f2e9;
+      --card: #fffdf8;
+      --line: #ded8ca;
+      --blue: #1677ff;
+      --blue-dark: #0958d9;
+      --yellow: #f2bf53;
+      --green: #b9d8cf;
+      --coral: #f2c2b5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 4%, rgba(242, 191, 83, 0.2), transparent 20rem),
+        radial-gradient(circle at 94% 90%, rgba(22, 119, 255, 0.1), transparent 22rem),
+        var(--paper);
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    }
+
+    .shell {
+      width: min(100% - 32px, 1080px);
+      margin: 0 auto;
+      padding: 42px 0 56px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 34px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 14px;
+      color: var(--blue-dark);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+
+    .eyebrow::before {
+      width: 26px;
+      height: 3px;
+      content: "";
+      background: var(--blue);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Microsoft YaHei", serif;
+      font-size: clamp(40px, 8vw, 72px);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .intro {
+      max-width: 400px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    .count {
+      flex: none;
+      padding: 15px 18px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--muted);
+      background: rgba(255, 253, 248, 0.72);
+      font-size: 13px;
+    }
+
+    .count strong {
+      margin-right: 4px;
+      color: var(--ink);
+      font-family: Georgia, serif;
+      font-size: 28px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .search {
+      width: min(100%, 280px);
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      outline: none;
+      color: var(--ink);
+      background: var(--card);
+      font: inherit;
+    }
+
+    .search:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+    }
+
+    .tools {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+      gap: 16px;
+    }
+
+    .tool-card {
+      display: flex;
+      min-width: 0;
+      min-height: 210px;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--card);
+      box-shadow: 0 4px 0 rgba(32, 35, 34, 0.04);
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .tool-card:hover {
+      border-color: var(--blue);
+      box-shadow: 0 16px 32px rgba(57, 48, 33, 0.12);
+      transform: translateY(-4px);
+    }
+
+    .tool-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .icon {
+      display: grid;
+      width: 48px;
+      height: 48px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--yellow);
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .tool-card:nth-child(2) .icon,
+    .tool-card:nth-child(5) .icon {
+      background: var(--green);
+    }
+
+    .tool-card:nth-child(3) .icon,
+    .tool-card:nth-child(6) .icon {
+      background: var(--coral);
+    }
+
+    .arrow {
+      color: var(--blue-dark);
+      font-size: 24px;
+    }
+
+    h3 {
+      margin: 23px 0 8px;
+      font-size: 21px;
+    }
+
+    .description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .open-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      margin-top: 16px;
+      color: var(--blue-dark);
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .open-link::after {
+      margin-left: 7px;
+      content: "→";
+    }
+
+    .empty {
+      display: none;
+      padding: 38px 0;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    footer {
+      margin-top: 38px;
+      color: #999;
+      font-size: 12px;
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100% - 24px, 480px);
+        padding-top: 30px;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 18px;
+        margin-bottom: 28px;
+      }
+
+      .count {
+        padding: 10px 14px;
+      }
+
+      .toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .search {
+        width: 100%;
+      }
+
+      .tools {
+        grid-template-columns: 1fr;
+      }
+
+      .tool-card {
+        min-height: 190px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <p class="eyebrow">DAILY TOOLKIT</p>
+        <h1>我的小工具</h1>
+        <p class="intro">把日常琐事交给顺手的小工具，打开即用，数据只保存在本地。</p>
+      </div>
+      <div class="count"><strong>6</strong> 个工具</div>
+    </header>
+
+    <section aria-labelledby="tools-title">
+      <div class="toolbar">
+        <h2 id="tools-title">选择一个工具</h2>
+        <label>
+          <span hidden>搜索工具</span>
+          <input class="search" type="search" placeholder="搜索工具…" autocomplete="off">
+        </label>
+      </div>
+
+      <div class="tools">
+        <article class="tool-card" data-search="待办清单 任务 计划">
+          <div><div class="tool-top"><span class="icon">✓</span><span class="arrow">↗</span></div><h3>待办清单</h3><p class="description">记录要做的事，让每一步都有着落。</p></div>
+          <a class="open-link" href="./%E5%BE%85%E5%8A%9E%E6%B8%85%E5%8D%95.html">立即打开</a>
+        </article>
+        <article class="tool-card" data-search="倒数日 日期 纪念日 事件">
+          <div><div class="tool-top"><span class="icon">◷</span><span class="arrow">↗</span></div><h3>倒数日</h3><p class="description">把重要的日子放在眼前，期待有迹可循。</p></div>
+          <a class="open-link" href="./%E5%80%92%E6%95%B0%E6%97%A5.html">立即打开</a>
+        </article>
+        <article class="tool-card" data-search="番茄钟 专注 时间 工作 学习">
+          <div><div class="tool-top"><span class="icon">25</span><span class="arrow">↗</span></div><h3>番茄钟</h3><p class="description">切分专注时间，给工作和学习一个节奏。</p></div>
+          <a class="open-link" href="./%E7%95%AA%E8%8C%84%E9%92%9F.html">立即打开</a>
+        </article>
+        <article class="tool-card" data-search="随机决定 选择 抉择">
+          <div><div class="tool-top"><span class="icon">?</span><span class="arrow">↗</span></div><h3>随机决定</h3><p class="description">当选择太多，就让一点随机替你拍板。</p></div>
+          <a class="open-link" href="./%E9%9A%8F%E6%9C%BA%E5%86%B3%E5%AE%9A.html">立即打开</a>
+        </article>
+        <article class="tool-card" data-search="图片压缩 图片 文件 体积">
+          <div><div class="tool-top"><span class="icon">▧</span><span class="arrow">↗</span></div><h3>图片压缩</h3><p class="description">缩小图片体积，分享和存储都更轻松。</p></div>
+          <a class="open-link" href="./%E5%9B%BE%E7%89%87%E5%8E%8B%E7%BC%A9.html">立即打开</a>
+        </article>
+        <article class="tool-card" data-search="中文文本统计 字数 文字 文本">
+          <div><div class="tool-top"><span class="icon">Aa</span><span class="arrow">↗</span></div><h3>中文文本统计</h3><p class="description">快速查看字数、段落和文本的基本信息。</p></div>
+          <a class="open-link" href="./%E5%AD%97%E6%95%B0%E7%BB%9F%E8%AE%A1.html">立即打开</a>
+        </article>
+      </div>
+      <p class="empty">没有找到匹配的工具</p>
+    </section>
+
+    <footer>本地工具集 · 无需登录，打开即用</footer>
+  </main>
+
+  <script>
+    const search = document.querySelector('.search');
+    const cards = [...document.querySelectorAll('.tool-card')];
+    const empty = document.querySelector('.empty');
+
+    search.addEventListener('input', () => {
+      const keyword = search.value.trim().toLowerCase();
+      let visible = 0;
+
+      cards.forEach((card) => {
+        const matched = card.dataset.search.toLowerCase().includes(keyword);
+        card.hidden = !matched;
+        if (matched) visible += 1;
+      });
+
+      empty.style.display = visible ? 'none' : 'block';
+    });
+  </script>
+</body>
+</html>

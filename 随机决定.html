@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>随机决定</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: clamp(24px, 8vw, 40px) 12px;
+      color: #111;
+      background: #fff;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      overflow-x: hidden;
+    }
+
+    .app {
+      width: min(100%, 520px);
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 28px;
+    }
+
+    .input-row,
+    .action-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      min-height: 44px;
+      padding: 11px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      color: #111;
+      font-size: 16px;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 4px;
+      color: #fff;
+      background: #1677ff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0958d9;
+    }
+
+    .action-row {
+      margin-top: 20px;
+    }
+
+    .wheel-wrap {
+      position: relative;
+      max-width: 100%;
+      width: min(100%, 360px);
+      margin: 28px auto 0;
+    }
+
+    .wheel {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border: 6px solid #111;
+      border-radius: 50%;
+      background: #f2f2f2;
+      transition: transform 3.5s cubic-bezier(0.12, 0.75, 0.18, 1);
+    }
+
+    .wheel::after {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 34px;
+      height: 34px;
+      border: 5px solid #111;
+      border-radius: 50%;
+      background: #fff;
+      content: "";
+      transform: translate(-50%, -50%);
+    }
+
+    .wheel-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 90px;
+      margin: -10px 0 0 -45px;
+      color: #111;
+      font-size: 13px;
+      font-weight: bold;
+      text-align: center;
+      overflow-wrap: anywhere;
+      transform-origin: center;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      z-index: 1;
+      width: 0;
+      height: 0;
+      border-right: 14px solid transparent;
+      border-left: 14px solid transparent;
+      border-top: 28px solid #1677ff;
+      transform: translateX(-50%);
+    }
+
+    .clear-button {
+      background: #111;
+    }
+
+    .clear-button:hover {
+      background: #444;
+    }
+
+    .result {
+      max-width: 100%;
+      min-height: 72px;
+      margin: 24px 0;
+      padding: 18px;
+      border: 2px solid #1677ff;
+      border-radius: 4px;
+      color: #1677ff;
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+
+    ul {
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    li {
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 480px) {
+      .input-row,
+      .action-row {
+        flex-direction: column;
+      }
+
+      .input-row > *,
+      .action-row > * {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>随机决定</h1>
+
+    <div class="input-row">
+      <input id="option-input" type="text" placeholder="输入一个选项">
+      <button id="add-button" type="button">添加</button>
+    </div>
+
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <div id="wheel" class="wheel"></div>
+    </div>
+
+    <div id="result" class="result">等待选择</div>
+
+    <div class="action-row">
+      <button id="random-button" type="button">随机选一个</button>
+      <button id="clear-button" class="clear-button" type="button">清空</button>
+    </div>
+
+    <ul id="option-list"></ul>
+  </main>
+
+  <script>
+    const input = document.getElementById('option-input');
+    const addButton = document.getElementById('add-button');
+    const randomButton = document.getElementById('random-button');
+    const clearButton = document.getElementById('clear-button');
+    const wheel = document.getElementById('wheel');
+    const result = document.getElementById('result');
+    const optionList = document.getElementById('option-list');
+    const storageKey = 'random-decision-options';
+    let wheelRotation = 0;
+    let isSpinning = false;
+
+    // 从浏览器本地读取选项，没有数据时使用空数组。
+    let options = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+    // 根据选项数量生成转盘分区和文字。
+    function renderWheel() {
+      wheel.innerHTML = '';
+      if (options.length === 0) {
+        wheel.style.background = '#f2f2f2';
+        return;
+      }
+
+      const colors = ['#d6e4ff', '#fff1b8', '#d9f7be', '#ffd6e7', '#d9d9d9'];
+      const segmentSize = 360 / options.length;
+      const segments = options.map((option, index) => {
+        const start = index * segmentSize;
+        const color = colors[index % colors.length];
+        return `${color} ${start}deg ${start + segmentSize}deg`;
+      });
+      wheel.style.background = `conic-gradient(from 0deg, ${segments.join(', ')})`;
+
+      options.forEach((option, index) => {
+        const angle = index * segmentSize + segmentSize / 2;
+        const label = document.createElement('span');
+        label.className = 'wheel-label';
+        label.textContent = option;
+        label.style.transform = `rotate(${angle}deg) translateY(-${Math.min(125, 38 + options.length * 2)}px) rotate(${-angle}deg)`;
+        wheel.appendChild(label);
+      });
+    }
+
+    // 保存选项、更新列表和转盘。
+    function saveAndRender() {
+      localStorage.setItem(storageKey, JSON.stringify(options));
+      optionList.innerHTML = '';
+
+      options.forEach((option) => {
+        const item = document.createElement('li');
+        item.textContent = option;
+        optionList.appendChild(item);
+      });
+
+      renderWheel();
+    }
+
+    addButton.addEventListener('click', () => {
+      const option = input.value.trim();
+      if (!option) return;
+
+      options.push(option);
+      input.value = '';
+      saveAndRender();
+      input.focus();
+    });
+
+    randomButton.addEventListener('click', () => {
+      if (options.length === 0 || isSpinning) {
+        if (options.length === 0) result.textContent = '请先添加选项';
+        return;
+      }
+
+      isSpinning = true;
+      randomButton.disabled = true;
+      const index = Math.floor(Math.random() * options.length);
+      const segmentSize = 360 / options.length;
+      const targetAngle = 360 - (index * segmentSize + segmentSize / 2);
+      wheelRotation += 1440 + targetAngle - (wheelRotation % 360);
+      wheel.style.transform = `rotate(${wheelRotation}deg)`;
+
+      setTimeout(() => {
+        result.textContent = options[index];
+        isSpinning = false;
+        randomButton.disabled = false;
+      }, 3500);
+    });
+
+    clearButton.addEventListener('click', () => {
+      if (isSpinning) return;
+      options = [];
+      wheelRotation = 0;
+      wheel.style.transform = 'rotate(0deg)';
+      result.textContent = '等待选择';
+      saveAndRender();
+    });
+
+    saveAndRender();
+  </script>
+</body>
+</html>

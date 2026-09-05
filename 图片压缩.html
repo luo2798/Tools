@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片压缩</title>
+  <style>
+    /* ===== 极简样式：白底黑字，手机自适应，不用任何外部库 ===== */
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #ffffff;
+      color: #000000;
+      font-family: -apple-system, "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* 内容居中，最大 720px，手机上自动贴边 */
+    .container {
+      width: min(100%, 720px);
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 14px;
+    }
+
+    /* ===== 上传区域（点击或拖拽） ===== */
+    .dropzone {
+      border: 2px dashed #999;      /* 虚线框提示“可放置” */
+      border-radius: 10px;
+      padding: 40px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragover {            /* 拖拽悬停时虚线变实、底色加深 */
+      border-color: #000;
+      border-style: solid;
+      background: #f7f7f7;
+    }
+
+    .dz-main {
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    .dz-sub {                       /* 灰色小字说明 */
+      font-size: 12px;
+      color: #999;
+      line-height: 1.6;
+    }
+
+    .info {                         /* 文件信息 / 错误提示 */
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      margin-top: 10px;
+      min-height: 16px;
+      word-break: break-all;
+    }
+
+    .info.error {                   /* 出错了显示红色 */
+      color: #c00000;
+    }
+
+    /* ===== 结果区（原图 / 压缩后对比） ===== */
+    .result {
+      margin-top: 16px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;  /* 电脑上左右并排 */
+      gap: 12px;
+    }
+
+    figure {
+      min-width: 0;
+    }
+
+    /* 窄屏（手机）时上下堆叠 */
+    @media (max-width: 520px) {
+      .compare {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    figure {
+      margin: 0;
+    }
+
+    figure img {
+      width: 100%;                    /* 图片宽度不超出容器 */
+      height: auto;
+      display: block;
+      background: #f3f3f3;            /* 加载中的浅灰底 */
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+
+    figcaption {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      margin-top: 6px;
+      word-break: break-all;
+    }
+
+    /* ===== 质量滑块 ===== */
+    .quality {
+      margin-top: 18px;
+    }
+
+    .quality-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .quality-head b {
+      font-size: 16px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      min-height: 44px;
+      accent-color: #000;             /* 滑块颜色（现代浏览器支持） */
+    }
+
+    /* ===== 下载按钮（用 <a> 实现，带 download 属性） ===== */
+    .actions {
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .btn {
+      display: inline-block;
+      min-height: 44px;
+      padding: 11px 34px;
+      font-size: 15px;
+      text-decoration: none;
+      background: #000;
+      color: #fff;
+      border-radius: 6px;
+      border: 1px solid #000;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: #333;
+    }
+
+    /* 还没压缩出结果时按钮置灰、不可点 */
+    .btn.disabled {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <h1>🖼 图片压缩</h1>
+
+    <!-- 上传区：点击打开文件选择，或把图片拖进这里 -->
+    <div class="dropzone" id="dropzone">
+      <p class="dz-main">点击选择图片，或把图片拖到此处</p>
+      <p class="dz-sub">支持 JPG / PNG / WebP / GIF<br>全程在本机浏览器处理，图片不会上传到任何服务器</p>
+    </div>
+
+    <!-- 文件选择框：被隐藏，由点击上传区触发 -->
+    <input type="file" id="fileInput" accept="image/*" hidden>
+
+    <!-- 一行提示：显示文件名 / 报错 -->
+    <div class="info" id="info"></div>
+
+    <!-- 结果区：选择图片成功后才显示 -->
+    <section class="result hidden" id="result">
+
+      <!-- 原图与压缩图并排对比 -->
+      <div class="compare">
+        <figure>
+          <img id="imgOriginal" alt="原图预览">
+          <figcaption id="capOriginal">原图</figcaption>
+        </figure>
+        <figure>
+          <img id="imgCompressed" alt="压缩后预览">
+          <figcaption id="capCompressed">压缩后</figcaption>
+        </figure>
+      </div>
+
+      <!-- 质量滑块 -->
+      <div class="quality">
+        <div class="quality-head">
+          <label for="qualitySlider">压缩质量</label>
+          <b id="qualityValue">80%</b>
+        </div>
+        <input type="range" id="qualitySlider" min="10" max="100" step="1" value="80">
+        <p class="dz-sub" id="qualityTip" style="margin-top:4px;text-align:left;">
+          数值越低文件越小、画质损失越多；80 左右通常看不出差别
+        </p>
+      </div>
+
+      <!-- 下载按钮 -->
+      <div class="actions">
+        <a class="btn disabled" id="downloadBtn">⬇ 下载压缩图片</a>
+      </div>
+
+    </section>
+
+  </div>
+
+  <script>
+    // ============================================================
+    // 1. 获取页面元素
+    // ============================================================
+    const dropzone = document.getElementById('dropzone');     // 上传区域
+    const fileInput = document.getElementById('fileInput');   // 隐藏的文件选择框
+    const info = document.getElementById('info');             // 提示文字
+    const result = document.getElementById('result');         // 结果区
+    const imgOriginal = document.getElementById('imgOriginal');   // 原图预览
+    const imgCompressed = document.getElementById('imgCompressed'); // 压缩图预览
+    const capOriginal = document.getElementById('capOriginal');     // 原图说明文字
+    const capCompressed = document.getElementById('capCompressed'); // 压缩图说明文字
+    const qualitySlider = document.getElementById('qualitySlider'); // 质量滑块
+    const qualityValue = document.getElementById('qualityValue');   // 滑块旁边显示的百分数
+    const qualityTip = document.getElementById('qualityTip');       // 滑块下方小提示
+    const downloadBtn = document.getElementById('downloadBtn');     // 下载按钮
+
+    // ============================================================
+    // 2. 状态变量
+    // ============================================================
+    let currentFile = null;   // 当前选择的原始图片文件
+    let currentImg = null;    // 解码后的图片对象（用于画到画布上）
+    let originalUrl = '';     // 原图预览用的临时地址
+    let compressedUrl = '';   // 压缩图预览用的临时地址
+    let version = 0;          // “任务序号”：压缩是异步的，用来丢弃过期结果
+    let compressTimer = null; // 防抖定时器（拖滑块时不会频繁压缩）
+
+    // ============================================================
+    // 3. 工具函数
+    // ============================================================
+    // 字节数转成人类可读的 B / KB / MB
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    // 在 info 一行显示普通提示（灰）或错误提示（红）
+    function setInfo(msg, isError) {
+      info.textContent = msg;
+      info.className = isError ? 'info error' : 'info';
+    }
+
+    // 把 File 解码成 Image 对象（Promise 写法，出错会 reject）
+    function loadImage(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('无法解码')); };
+        img.src = url;
+      });
+    }
+
+    // 检测浏览器是否支持把图片编码成 WebP（几乎所有现代浏览器都支持）
+    let webpSupport = null;   // null = 还没检测过
+    function webpSupported() {
+      if (webpSupport === null) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 1;
+        webpSupport = c.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+      }
+      return webpSupport;
+    }
+
+    // 把图片原尺寸画到一张画布上（不缩放，只靠“重新编码”来减小体积）
+    function makeCanvas(img) {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      return c;
+    }
+
+    // 画布 → Blob（Promise 写法）
+    // 注意：质量参数对 PNG 无效（PNG 是无损格式），传了也会被浏览器忽略
+    function canvasToBlob(canvas, type, quality) {
+      return new Promise(resolve => {
+        canvas.toBlob(resolve, type, quality);
+      });
+    }
+
+    // MIME 类型 → 显示用的简称和下载文件后缀
+    function typeInfo(type) {
+      if (type === 'image/jpeg') return { label: 'JPG', ext: 'jpg' };
+      if (type === 'image/webp') return { label: 'WebP', ext: 'webp' };
+      return { label: 'PNG', ext: 'png' };
+    }
+
+    // ============================================================
+    // 4. 加载图片
+    // ============================================================
+    async function loadFile(file) {
+      // 非图片文件直接拒绝
+      if (!file || !file.type.startsWith('image/')) {
+        setInfo('⚠️ 这不是图片文件，请选择 JPG / PNG 等图片', true);
+        return;
+      }
+
+      currentFile = file;
+      version++;                       // 作废上一次还没完成的压缩
+      clearTimeout(compressTimer);
+      result.classList.add('hidden');  // 先收起结果区，加载成功再显示
+      downloadBtn.classList.add('disabled');
+      downloadBtn.removeAttribute('href');  // 清掉旧下载地址
+      setInfo('正在读取图片…');
+
+      try {
+        const img = await loadImage(file);
+        if (currentFile !== file) return;  // 等待期间用户换了图，丢弃这次结果
+        currentImg = img;
+
+        // 替换原图预览（先释放旧地址，避免内存泄漏）
+        if (originalUrl) URL.revokeObjectURL(originalUrl);
+        originalUrl = URL.createObjectURL(file);
+        imgOriginal.src = originalUrl;
+        imgOriginal.alt = file.name;
+
+        // 说明行：文件名 · 原图大小 · 尺寸
+        let msg = file.name + ' · ' + formatSize(file.size) +
+                  ' · ' + img.naturalWidth + '×' + img.naturalHeight;
+        if (file.type === 'image/gif') msg += '（动图只保留第一帧）';
+        setInfo(msg);
+
+        // 显示对比区并开始压缩
+        result.classList.remove('hidden');
+        capOriginal.textContent = '原图 · ' + formatSize(file.size);
+        scheduleCompress();            // 立刻按当前滑块质量压缩一次
+      } catch (e) {
+        setInfo('⚠️ 无法读取这张图片（格式不支持或文件已损坏）', true);
+      }
+    }
+
+    // ============================================================
+    // 5. 压缩
+    // ============================================================
+    // 拖动滑块时先用防抖“冷静”一下，松开片刻后才真正压缩
+    function scheduleCompress() {
+      clearTimeout(compressTimer);
+      compressTimer = setTimeout(doCompress, 150);
+    }
+
+    async function doCompress() {
+      if (!currentImg) return;
+      const myVersion = ++version;            // 本次任务的序号
+      const quality = qualitySlider.value / 100;   // 滑块的 10~100 换算成 0.1~1
+
+      capCompressed.textContent = '压缩中…';
+
+      try {
+        const canvas = makeCanvas(currentImg);
+
+        // 决定输出格式：
+        //   PNG / WebP 原图可能带透明通道 → 输出 WebP（体积小且保留透明）
+        //   JPG 等其它格式 → 统一输出 JPG
+        //   浏览器不支持 WebP 编码时，带透明的输出 PNG 兜底
+        let type;
+        if (webpSupported() &&
+            (currentFile.type === 'image/png' || currentFile.type === 'image/webp')) {
+          type = 'image/webp';
+        } else if (currentFile.type === 'image/png') {
+          type = 'image/png';
+        } else {
+          type = 'image/jpeg';
+        }
+
+        // 编码成 Blob；万一 WebP 失败，用 PNG 兜底一次
+        let blob = await canvasToBlob(canvas, type, quality);
+        if (!blob && type === 'image/webp') {
+          type = 'image/png';
+          blob = await canvasToBlob(canvas, type);
+        }
+        if (!blob) throw new Error('编码失败');
+
+        // 压缩期间滑块又被拖动过？旧结果作废，等新的一次
+        if (myVersion !== version) return;
+
+        // 释放旧压缩图地址，换上新图
+        if (compressedUrl) URL.revokeObjectURL(compressedUrl);
+        compressedUrl = URL.createObjectURL(blob);
+        imgCompressed.src = compressedUrl;
+
+        // 说明文字：压缩后大小 · 格式 · 节省百分比
+        const t = typeInfo(type);
+        const saved = 1 - blob.size / currentFile.size;
+        let msg = '压缩后 · ' + formatSize(blob.size) + ' · ' + t.label;
+        msg += saved > 0
+          ? ' · 节省 ' + Math.round(saved * 100) + '%'
+          : ' · 反而变大 ' + Math.round(-saved * 100) + '%（试试调低质量）';
+        capCompressed.textContent = msg;
+
+        // 滑块下方的小提示，随输出格式变化
+        if (type === 'image/png') {
+          qualityTip.textContent = 'PNG 为无损格式，大小基本不变；想大幅压缩请选 JPG 图片';
+        } else if (type === 'image/webp') {
+          qualityTip.textContent = 'WebP 兼顾画质与体积，已保留透明背景；Chrome / Edge / Safari 都能打开';
+        } else {
+          qualityTip.textContent = '数值越低文件越小、画质损失越多；80 左右通常看不出差别';
+        }
+
+        // 让下载按钮指向新生成的图片
+        downloadBtn.href = compressedUrl;
+        downloadBtn.download = buildFileName(t.ext);
+        downloadBtn.classList.remove('disabled');
+      } catch (e) {
+        if (myVersion === version) {
+          capCompressed.textContent = '压缩失败：图片尺寸过大或浏览器不支持';
+        }
+      }
+    }
+
+    // 生成下载文件名：原文件名去掉扩展名 + “_compressed.新扩展名”
+    function buildFileName(ext) {
+      const base = currentFile.name.replace(/\.[^.]+$/, '') || 'image';
+      return base + '_compressed.' + ext;
+    }
+
+    // ============================================================
+    // 6. 事件绑定
+    // ============================================================
+    // 点击上传区 → 打开文件选择框
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    // 选好文件后开始处理；把 value 清空，方便下次选同一个文件
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) loadFile(fileInput.files[0]);
+      fileInput.value = '';
+    });
+
+    // 拖拽进入上传区时高亮虚线框
+    dropzone.addEventListener('dragover', e => {
+      e.preventDefault();                 // 必须阻止默认行为，drop 才会触发
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    // 松开鼠标放下文件 → 取第一个文件处理
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        loadFile(file);
+      } else {
+        setInfo('⚠️ 没有检测到文件', true);
+      }
+    });
+
+    // 拖到页面其它位置时不默认“用图片打开网页”，避免误触
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => e.preventDefault());
+
+    // 拖动质量滑块 → 更新旁边的百分数并重新压缩
+    qualitySlider.addEventListener('input', () => {
+      qualityValue.textContent = qualitySlider.value + '%';
+      scheduleCompress();
+    });
+  </script>
+</body>
+</html>
