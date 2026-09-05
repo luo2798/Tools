@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>待办清单</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: clamp(24px, 8vw, 40px) 12px;
+      color: #111;
+      background: #fff;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      overflow-x: hidden;
+    }
+
+    .todo-app {
+      width: min(100%, 520px);
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 28px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"],
+    input[type="datetime-local"] {
+      flex: 1;
+      min-width: 0;
+      min-height: 44px;
+      padding: 11px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      color: #111;
+      font-size: 16px;
+    }
+
+    input[type="datetime-local"] {
+      flex-basis: 190px;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 4px;
+      color: #fff;
+      background: #1677ff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0958d9;
+    }
+
+    .notice {
+      display: none;
+      margin: 16px 0 0;
+      color: #d00;
+      font-size: 14px;
+    }
+
+    ul {
+      padding: 0;
+      margin: 24px 0 0;
+      list-style: none;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    li span {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    li small {
+      color: #777;
+      font-size: 12px;
+    }
+
+    li.completed span {
+      color: #777;
+      text-decoration: line-through;
+    }
+
+    .delete-button {
+      min-width: 60px;
+      padding: 10px 12px;
+      background: #111;
+      font-size: 13px;
+    }
+
+    .delete-button:hover {
+      background: #444;
+    }
+
+    @media (max-width: 480px) {
+      .input-row > input,
+      .input-row > button {
+        flex-basis: 100%;
+        width: 100%;
+      }
+
+      li {
+        align-items: flex-start;
+      }
+
+      li input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        margin: 10px 0 0;
+        flex: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="todo-app">
+    <h1>待办清单</h1>
+    <div class="input-row">
+      <input id="todo-input" type="text" placeholder="输入待办事项">
+      <input id="reminder-input" type="datetime-local" aria-label="提醒时间">
+      <button id="add-button" type="button">添加</button>
+    </div>
+    <p id="notice" class="notice"></p>
+    <ul id="todo-list"></ul>
+  </main>
+
+  <script>
+    const input = document.getElementById('todo-input');
+    const reminderInput = document.getElementById('reminder-input');
+    const addButton = document.getElementById('add-button');
+    const todoList = document.getElementById('todo-list');
+    const notice = document.getElementById('notice');
+    const storageKey = 'todo-list';
+
+    // 从浏览器本地读取待办数据，没有数据时使用空数组。
+    let todos = JSON.parse(localStorage.getItem(storageKey) || '[]').map((todo) => ({
+      ...todo,
+      reminderAt: todo.reminderAt || '',
+      notified: todo.notified || false
+    }));
+
+    // 显示浏览器通知不可用时的页面内红色提示。
+    function showNotice(message) {
+      notice.textContent = message;
+      notice.style.display = 'block';
+    }
+
+    // 请求通知权限；权限被拒绝时，提醒会降级到页面内提示。
+    function requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        showNotice('当前浏览器不支持通知，将使用页面内红色提示。');
+        return;
+      }
+
+      Notification.requestPermission().then((permission) => {
+        if (permission !== 'granted') {
+          showNotice('浏览器通知权限未开启，将使用页面内红色提示。');
+        }
+      }).catch(() => {
+        showNotice('当前环境无法请求通知权限，将使用页面内红色提示。');
+      });
+    }
+
+    // 保存数据并重新显示列表。
+    function saveAndRender() {
+      localStorage.setItem(storageKey, JSON.stringify(todos));
+      todoList.innerHTML = '';
+
+      todos.forEach((todo, index) => {
+        const item = document.createElement('li');
+        if (todo.completed) item.classList.add('completed');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = todo.completed;
+        checkbox.addEventListener('change', () => {
+          todos[index].completed = checkbox.checked;
+          saveAndRender();
+        });
+
+        const text = document.createElement('span');
+        text.textContent = todo.text;
+
+        if (todo.reminderAt) {
+          const reminder = document.createElement('small');
+          reminder.textContent = `提醒：${new Date(todo.reminderAt).toLocaleString()}`;
+          item.appendChild(reminder);
+        }
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'delete-button';
+        deleteButton.type = 'button';
+        deleteButton.textContent = '删除';
+        deleteButton.addEventListener('click', () => {
+          todos.splice(index, 1);
+          saveAndRender();
+        });
+
+        item.append(checkbox, text, deleteButton);
+        todoList.appendChild(item);
+      });
+    }
+
+    // 添加一条非空待办事项。
+    function addTodo() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      const reminderAt = reminderInput.value;
+      todos.push({ text, completed: false, reminderAt, notified: false });
+      input.value = '';
+      reminderInput.value = '';
+      if (reminderAt) requestNotificationPermission();
+      saveAndRender();
+      input.focus();
+    }
+
+    // 页面保持打开时每秒检查一次到期提醒。
+    function checkReminders() {
+      const now = Date.now();
+      let changed = false;
+
+      todos.forEach((todo) => {
+        if (!todo.reminderAt || todo.completed || todo.notified) return;
+        if (new Date(todo.reminderAt).getTime() > now) return;
+
+        todo.notified = true;
+        changed = true;
+        const message = `待办提醒：${todo.text}`;
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification('待办提醒', { body: todo.text });
+          } catch (error) {
+            showNotice(message);
+          }
+        } else {
+          showNotice(message);
+        }
+      });
+
+      if (changed) localStorage.setItem(storageKey, JSON.stringify(todos));
+    }
+
+    addButton.addEventListener('click', addTodo);
+    saveAndRender();
+    setInterval(checkReminders, 1000);
+    checkReminders();
+  </script>
+</body>
+</html>

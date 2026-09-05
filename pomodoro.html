@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>番茄钟</title>
+  <style>
+    /* ===== 极简样式：白底黑字，不用任何外部库 ===== */
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #ffffff;   /* 白色背景 */
+      color: #000000;        /* 黑色文字 */
+      font-family: -apple-system, "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* 整个页面内容居中：上下左右都居中，像真正的计时器 App */
+    .container {
+      min-height: 100vh;
+      width: min(100%, 420px);
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 32px;
+    }
+
+    /* 设定分钟数的输入框 */
+    .set {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .set label {
+      font-size: 14px;
+      color: #666;
+    }
+
+    input[type="number"] {
+      width: 90px;
+      min-height: 44px;
+      padding: 6px 8px;
+      font-size: 16px;
+      text-align: center;
+      border: 1px solid #000;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    /* 计时中禁止修改时长，输入框变灰提示不可用 */
+    input[type="number"]:disabled {
+      background: #f0f0f0;
+      border-color: #999;
+      cursor: not-allowed;
+    }
+
+    /* 大大的倒计时数字 */
+    .display {
+      max-width: 100%;
+      font-size: clamp(56px, 20vw, 88px);
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums; /* 数字等宽，跳秒时不会左右抖动 */
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    /* 状态提示：就绪 / 进行中 / 已暂停 / 时间到 */
+    .status {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 28px;
+      min-height: 20px; /* 占住位置，文字变化时页面不跳动 */
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 10px 26px;
+      font-size: 15px;
+      cursor: pointer;
+      background: #fff;
+      color: #000;
+      border: 1px solid #000;
+      border-radius: 4px;
+    }
+
+    button.primary {      /* “开始”用黑底白字，更醒目 */
+      background: #000;
+      color: #fff;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f2f2f2;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: #333;
+    }
+
+    /* 禁用（不该点）的按钮变淡 */
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* “试听提示音”按钮：小小的次要按钮，不抢主按钮的视觉 */
+    .test-btn {
+      margin-top: 18px;
+      min-height: 44px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #888;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 999px;
+    }
+
+    .test-btn:hover:not(:disabled) {
+      color: #000;
+      border-color: #000;
+      background: #f2f2f2;
+    }
+
+    /* ===== 时间到：整屏变红并闪烁 ===== */
+    body.timeup {
+      animation: flash 0.8s ease-in-out infinite;
+    }
+
+    @keyframes flash {
+      0%, 100% { background-color: #ffe6e6; } /* 浅红 */
+      50%      { background-color: #ff6b6b; } /* 深红 */
+    }
+
+    /* 闪烁时数字和状态文字也变成红色，更有“警告”感 */
+    body.timeup .display {
+      color: #c00000;
+    }
+
+    body.timeup .status {
+      color: #a00000;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <h1>🍅 番茄钟</h1>
+
+    <!-- 设定分钟数：输入数字即更新倒计时 -->
+    <div class="set">
+      <label for="minutesInput">设定分钟数</label>
+      <input type="number" id="minutesInput" min="1" max="600" step="1" value="25">
+    </div>
+
+    <!-- 倒计时大数字 -->
+    <div class="display" id="display">25:00</div>
+
+    <!-- 状态提示文字 -->
+    <div class="status" id="statusText">就绪</div>
+
+    <!-- 三个控制按钮 -->
+    <div class="toolbar">
+      <button id="startBtn" class="primary">开始</button>
+      <button id="pauseBtn">暂停</button>
+      <button id="resetBtn">重置</button>
+    </div>
+
+    <!-- 试听提示音：先点一下确认能听到声音、音量合适 -->
+    <button id="testSoundBtn" class="test-btn">🔔 试听提示音</button>
+
+  </div>
+
+  <script>
+    // ============================================================
+    // 1. 获取页面元素
+    // ============================================================
+    const minutesInput = document.getElementById('minutesInput'); // 分钟输入框
+    const display = document.getElementById('display');           // 倒计时数字
+    const statusText = document.getElementById('statusText');     // 状态提示
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const testSoundBtn = document.getElementById('testSoundBtn'); // 试听按钮
+
+    // ============================================================
+    // 2. 计时器状态变量
+    // ============================================================
+    let remaining = 25 * 60;  // 当前剩余秒数（默认 25 分钟）
+    let timerId = null;       // setInterval 的编号，用于停止计时
+    let endTime = 0;          // 预计结束的时刻（时间戳，毫秒）
+    let running = false;      // 是否正在计时
+    let finished = false;     // 是否刚“时间到”（屏幕正闪烁）
+    let started = false;      // 是否开始过（用于区分“就绪”和“已暂停”）
+
+    // ============================================================
+    // 3. 工具函数
+    // ============================================================
+    // 把秒数格式化成 MM:SS；超过 1 小时自动变成 H:MM:SS
+    function formatTime(totalSec) {
+      totalSec = Math.max(0, Math.ceil(totalSec));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      const mm = String(m).padStart(2, '0');
+      const ss = String(s).padStart(2, '0');
+      return h > 0 ? h + ':' + mm + ':' + ss : mm + ':' + ss;
+    }
+
+    // 读取输入框的分钟数；无效输入（空、0、负数）一律按 1 处理
+    function readMinutes() {
+      let v = parseInt(minutesInput.value, 10);
+      if (isNaN(v) || v < 1) v = 1;
+      minutesInput.value = v;
+      return v;
+    }
+
+    // 刷新屏幕上的倒计时数字和浏览器标签页标题
+    function render() {
+      display.textContent = formatTime(remaining);
+      if (finished) {
+        document.title = '⏰ 时间到！';
+      } else if (running) {
+        document.title = '⏳ ' + formatTime(remaining) + ' · 番茄钟';
+      } else {
+        document.title = '番茄钟';
+      }
+    }
+
+    // 根据当前状态，决定哪些按钮、输入框可用或禁用
+    function updateControls() {
+      startBtn.disabled = running;                          // 计时中不能再点“开始”
+      pauseBtn.disabled = !running;                         // 只有计时中才能“暂停”
+      // 正在计时或已暂停时锁定输入框；就绪、时间到时可以修改
+      minutesInput.disabled = started && !finished;
+    }
+
+    // ------------------------------------------------------------------
+    // 声音提醒：用浏览器自带的 Web Audio 现场合成“滴滴”声，不需要任何音频文件
+    // ------------------------------------------------------------------
+    let audioCtx = null;   // 音频上下文，整个页面只建一个
+
+    // 解锁浏览器音频。浏览器规定：必须先有用户点击，页面才能出声，
+    // 所以在“开始”按钮的点击事件里调用一次，时间到时就能正常播放了。
+    function unlockAudio() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {
+        /* 老浏览器不支持时静默跳过，不影响计时功能 */
+      }
+    }
+
+    // 播放一声短“嘀”：durationMs = 每声时长，delayMs = 推迟多少毫秒开始
+    function beep(durationMs, delayMs) {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();   // 发声器
+      const gain = audioCtx.createGain();        // 音量控制器
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'square';         // 方波：声音更“尖”，容易被注意到
+      osc.frequency.value = 880;   // 880Hz，类似电话铃声的“嘀”
+      const t = audioCtx.currentTime + delayMs / 1000;
+      gain.gain.setValueAtTime(0.0001, t);                                  // 从几乎无声开始
+      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);                 // 20ms 内升到 0.3
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + durationMs / 1000); // 结束时渐隐，避免“啪”的杂音
+      osc.start(t);
+      osc.stop(t + durationMs / 1000 + 0.05);
+    }
+
+    // 时间到提醒：连响两轮“滴滴滴”（共 6 声，约 2 秒）
+    function playAlarm() {
+      unlockAudio();
+      for (let round = 0; round < 2; round++) {
+        for (let i = 0; i < 3; i++) {
+          beep(200, round * 1500 + i * 250);   // 每声 0.2 秒，间隔 0.25 秒
+        }
+      }
+    }
+
+    // ============================================================
+    // 4. 核心逻辑
+    // ============================================================
+    // 每秒的心跳：根据“目标结束时刻”计算剩余时间。
+    // 不用每秒 -1 的方式，而是比对当前时间，这样切到别的标签页
+    // 或电脑卡顿导致计时器变慢时，时间依然准确。
+    function tick() {
+      const leftMs = endTime - Date.now();
+      if (leftMs <= 0) {
+        remaining = 0;
+        render();
+        finish();       // 时间到！
+        return;
+      }
+      remaining = Math.ceil(leftMs / 1000);
+      render();
+    }
+
+    // 开始（或继续）
+    function startTimer() {
+      if (running) return;
+      // 刚“时间到”或剩余为 0 时点开始 = 从输入框重新装载时长再来一轮
+      if (finished || remaining <= 0) {
+        finished = false;
+        remaining = readMinutes() * 60;
+      }
+      running = true;
+      started = true;
+      document.body.classList.remove('timeup'); // 恢复正常白底
+      unlockAudio();                            // 利用这次用户点击“解锁”浏览器音频
+      endTime = Date.now() + remaining * 1000;  // 记录目标结束时刻
+      // 每 250 毫秒检查一次（比 1 秒更精确，显示仍按整秒）
+      timerId = setInterval(tick, 250);
+      tick();                                   // 立刻刷新一次，不用干等
+      statusText.textContent = '⏳ 进行中…';
+      updateControls();
+    }
+
+    // 暂停
+    function pauseTimer() {
+      if (!running) return;
+      clearInterval(timerId);
+      timerId = null;
+      running = false;
+      // 暂停时把剩余时间结算成整秒存好，方便下次“开始”接着数
+      remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      render();
+      statusText.textContent = '⏸ 已暂停（点击「开始」继续）';
+      updateControls();
+    }
+
+    // 重置：停止计时，按输入框的分钟数重新装载
+    function resetTimer() {
+      clearInterval(timerId);
+      timerId = null;
+      running = false;
+      started = false;
+      finished = false;
+      document.body.classList.remove('timeup'); // 停止红色闪烁
+      remaining = readMinutes() * 60;
+      render();
+      statusText.textContent = '就绪';
+      updateControls();
+    }
+
+    // 时间到：停止计时，让屏幕变红闪烁提醒
+    function finish() {
+      clearInterval(timerId);
+      timerId = null;
+      running = false;
+      finished = true;
+      document.body.classList.add('timeup');    // 触发 CSS 的红色闪烁动画
+      playAlarm();                              // 同时播放“滴滴滴”提示音
+      statusText.textContent = '⏰ 时间到！点击「开始」或「重置」继续';
+      updateControls();
+    }
+
+    // ============================================================
+    // 5. 事件绑定
+    // ============================================================
+    // 输入分钟数时（未在计时），立刻更新倒计时显示
+    minutesInput.addEventListener('input', () => {
+      if (!running) {
+        remaining = readMinutes() * 60;
+        render();
+      }
+    });
+
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+
+    // 试听按钮：点击播放一次完整提示音，顺便完成音频“解锁”
+    testSoundBtn.addEventListener('click', playAlarm);
+
+    // 页面打开时初始化一次
+    render();
+    updateControls();
+  </script>
+</body>
+</html>
